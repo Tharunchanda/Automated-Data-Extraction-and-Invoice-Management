@@ -1,0 +1,11 @@
+node_modules/
+.env
+dist/
+.DS_Store
+.vscode/
+coverage/
+npm-debug.log
+yarn-error.log
+.pnp.*
+.cache/
+Backend/data-analytics-461707-b2a6c89192f0.json
