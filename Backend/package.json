@@ -2,9 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,7 +15,11 @@
   "dependencies": {
     "@google-cloud/aiplatform": "^5.11.0",
     "@google-cloud/storage": "^7.17.2",
+    "@google-cloud/vision": "^5.3.4",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.12.2",
     "canvas": "^3.2.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
@@ -21,5 +27,8 @@
     "pdf-parse": "^2.4.5",
     "sharp": "^0.34.4",
     "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
