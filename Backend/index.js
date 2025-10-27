@@ -8,7 +8,15 @@ import { geminiExtract } from './gemini.js';
 dotenv.config();
 
 const app = express();
-app.use(cors()); // Enable CORS for all routes
+
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
 const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory for direct access
 
 app.use(express.json());

@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { addInvoices, setInvoices } from '../slices/invoicesSlice';
 import { addProducts, setProducts } from '../slices/productsSlice';
 import { addCustomers, setCustomers } from '../slices/customersSlice';
+import Download from './Download';
 
 export default function Upload() {
   const [files, setFiles] = useState([]);
@@ -292,6 +293,9 @@ export default function Upload() {
           </div>
         </div>
       )}
+
+      {/* Download Section */}
+      <Download />
     </div>
   );
 }
