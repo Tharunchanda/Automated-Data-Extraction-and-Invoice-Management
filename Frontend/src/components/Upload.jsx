@@ -44,7 +44,7 @@ export default function Upload() {
       setFileProgress(initialProgress);
 
       setStatus('⬆️ Uploading to server...');
-      const API_BASE = (import.meta?.env?.VITE_API_URL) || '/api';
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
       
       console.log('🔗 API Base URL:', API_BASE);
       console.log('📤 Uploading to:', `${API_BASE}/extract-stream`);
