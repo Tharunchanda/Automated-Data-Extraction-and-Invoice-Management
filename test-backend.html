@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Backend API Test</h1>
+    
+    <h2>1. Test Health Endpoint</h2>
+    <button onclick="testHealth()">Test /api/health</button>
+    <pre id="health-result"></pre>
+
+    <h2>2. Test File Upload</h2>
+    <input type="file" id="fileInput" multiple />
+    <button onclick="testUpload()">Upload & Extract</button>
+    <pre id="upload-result"></pre>
+
+    <script>
+        const API_URL = 'https://automated-data-extraction-and-invoice-jk3f.onrender.com';
+
+        async function testHealth() {
+            const resultEl = document.getElementById('health-result');
+            resultEl.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/health`);
+                const data = await response.json();
+                resultEl.className = 'success';
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function testUpload() {
+            const resultEl = document.getElementById('upload-result');
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                resultEl.className = 'error';
+                resultEl.textContent = 'Please select at least one file';
+                return;
+            }
+
+            resultEl.textContent = 'Uploading...';
+            
+            const formData = new FormData();
+            for (let file of fileInput.files) {
+                formData.append('files', file);
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/extract-stream`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+                    throw new Error(JSON.stringify(errorData, null, 2));
+                }
+
+                // Read streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let result = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    result += decoder.decode(value, { stream: true });
+                }
+
+                resultEl.className = 'success';
+                resultEl.textContent = result;
+            } catch (error) {
+                resultEl.className = 'error';
+                resultEl.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

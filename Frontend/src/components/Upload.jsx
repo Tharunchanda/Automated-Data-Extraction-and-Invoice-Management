@@ -45,6 +45,9 @@ export default function Upload() {
 
       setStatus('⬆️ Uploading to server...');
       const API_BASE = (import.meta?.env?.VITE_API_URL) || '/api';
+      
+      console.log('🔗 API Base URL:', API_BASE);
+      console.log('📤 Uploading to:', `${API_BASE}/extract-stream`);
 
       // Use fetch for SSE support
       const response = await fetch(`${API_BASE}/extract-stream`, {
