@@ -106,6 +106,12 @@ export default function Upload() {
                     : f
                 ));
                 
+                console.log('📦 fileComplete event:', {
+                  invoices: data.invoices?.length || 0,
+                  products: data.products?.length || 0,
+                  customers: data.customers?.length || 0
+                });
+                
                 // Add data incrementally
                 if (data.invoices?.length) dispatch(addInvoices(data.invoices));
                 if (data.products?.length) dispatch(addProducts(data.products));
@@ -123,6 +129,14 @@ export default function Upload() {
 
               case 'complete':
                 setStatus(`✅ All files processed successfully!`);
+                
+                console.log('✨ complete event:', {
+                  invoices: data.invoices?.length || 0,
+                  products: data.products?.length || 0,
+                  customers: data.customers?.length || 0
+                });
+                console.log('Products data:', data.products);
+                console.log('Customers data:', data.customers);
                 
                 // Update with final aggregated data
                 if (data.invoices?.length) dispatch(setInvoices(data.invoices));

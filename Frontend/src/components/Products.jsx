@@ -7,6 +7,8 @@ export default function Products() {
   const products = useSelector(s=>s.products.list);
   const dispatch = useDispatch();
 
+  console.log('📦 Products component render:', products?.length || 0, 'products');
+
   const onNameChange = (id, name) => {
     dispatch(updateProduct({ id, changes: { name } }));
     dispatch(updateProductNameInInvoices({ productId: id, name }));
@@ -14,7 +16,12 @@ export default function Products() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-blue-900">📦 Products</h2>
+      <h2 className="text-2xl font-bold text-blue-900">📦 Products ({products.length})</h2>
+      {products.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          No products extracted yet. Upload an invoice to see products here.
+        </div>
+      ) : (
       <div className="overflow-auto rounded-xl border border-blue-200 shadow-sm">
         <table className="w-full table-auto">
           <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -45,6 +52,7 @@ export default function Products() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

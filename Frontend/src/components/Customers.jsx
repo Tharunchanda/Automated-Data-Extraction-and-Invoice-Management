@@ -7,6 +7,8 @@ export default function Customers() {
   const customers = useSelector(s=>s.customers.list);
   const dispatch = useDispatch();
 
+  console.log('👥 Customers component render:', customers?.length || 0, 'customers');
+
   const onNameChange = (id, name) => {
     dispatch(updateCustomer({ id, changes: { name } }));
     dispatch(updateCustomerNameInInvoices({ customerId: id, name }));
@@ -14,7 +16,12 @@ export default function Customers() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-blue-900">👥 Customers</h2>
+      <h2 className="text-2xl font-bold text-blue-900">👥 Customers ({customers.length})</h2>
+      {customers.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          No customers extracted yet. Upload an invoice to see customers here.
+        </div>
+      ) : (
       <div className="overflow-auto rounded-xl border border-blue-200 shadow-sm">
         <table className="w-full table-auto">
           <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -41,6 +48,7 @@ export default function Customers() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
