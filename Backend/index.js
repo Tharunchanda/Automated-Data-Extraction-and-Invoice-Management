@@ -381,9 +381,11 @@ app.post('/api/extract', upload.array('files'), async (req, res) => {
 
   } catch (err) {
     console.error('❌ Extraction error:', err);
+    console.error('Error stack:', err.stack);
     const errorResponse = { 
       error: err.message,
-      details: 'Make sure GEMINI_API_KEY is set in .env file'
+      details: err.stack,
+      hint: 'Check if GEMINI_API_KEY is set correctly in environment variables'
     };
     console.error('Sending error response:', errorResponse);
     res.status(500).json(errorResponse);
@@ -391,6 +393,16 @@ app.post('/api/extract', upload.array('files'), async (req, res) => {
 });
 
 app.get('/api/ping', (req, res) => res.json({ ok: true }));
+
+app.get('/api/health', (req, res) => {
+  const hasGeminiKey = !!process.env.GEMINI_API_KEY;
+  res.json({ 
+    status: 'running',
+    hasGeminiKey,
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV || 'development'
+  });
+});
 
 // New streaming endpoint for incremental file processing
 app.post('/api/extract-stream', upload.array('files'), async (req, res) => {

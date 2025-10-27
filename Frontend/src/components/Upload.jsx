@@ -53,7 +53,16 @@ export default function Upload() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMsg = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorMsg;
+          if (errorData.hint) errorMsg += `\n${errorData.hint}`;
+          console.error('Backend error details:', errorData);
+        } catch (e) {
+          // Response is not JSON
+        }
+        throw new Error(errorMsg);
       }
 
       const reader = response.body.getReader();
