@@ -17,9 +17,17 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory for direct access
+// Configure multer with size limits for Render free tier
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max per file
+    files: 10 // max 10 files at once
+  }
+});
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // -------------------- helpers: totals and parsing --------------------
 function num(v, d = 0) {
@@ -139,6 +147,27 @@ function computeInvoiceTotals(inv) {
   };
 }
 // --------------------------------------------------------------------
+
+// Multer error handling middleware
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'File too large',
+        hint: 'Maximum file size is 10MB per file'
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ 
+        error: 'Too many files',
+        hint: 'Maximum 10 files allowed per upload'
+      });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
+});
 
 app.post('/api/extract', upload.array('files'), async (req, res) => {
   console.log('\n📥 Received extraction request');

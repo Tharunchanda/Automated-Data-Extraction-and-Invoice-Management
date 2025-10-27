@@ -223,10 +223,25 @@ export async function geminiExtract(files) {
       }
     } catch (error) {
       // This catches errors from the Gemini API call itself
-      console.error(`Gemini API error for ${file.originalname}:`, error.message);
+      console.error(`Gemini API error for ${file.originalname}:`, error);
+      
+      let errorMessage = error.message || 'Unknown error';
+      
+      // Check for common API errors
+      if (error.message?.includes('quota')) {
+        errorMessage = 'Gemini API quota exceeded. Please try again later or upgrade your API plan.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = 'Gemini API rate limit reached. Please wait a moment and try again.';
+      } else if (error.message?.includes('API key')) {
+        errorMessage = 'Invalid Gemini API key. Please check your configuration.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try with a smaller file.';
+      }
+      
       results.files.push({
         file: file.originalname,
-        error: error.message
+        error: errorMessage,
+        details: error.message
       });
     }
   }
