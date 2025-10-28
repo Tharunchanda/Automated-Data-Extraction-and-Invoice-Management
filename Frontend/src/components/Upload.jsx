@@ -130,18 +130,35 @@ export default function Upload() {
               case 'complete':
                 setStatus(`✅ All files processed successfully!`);
                 
-                console.log('✨ complete event:', {
+                console.log('✨ complete event received:', {
                   invoices: data.invoices?.length || 0,
                   products: data.products?.length || 0,
                   customers: data.customers?.length || 0
                 });
-                console.log('Products data:', data.products);
-                console.log('Customers data:', data.customers);
+                console.log('📦 Complete - Products data:', data.products);
+                console.log('👥 Complete - Customers data:', data.customers);
+                console.log('📄 Complete - Invoices data:', data.invoices);
                 
                 // Update with final aggregated data
-                if (data.invoices?.length) dispatch(setInvoices(data.invoices));
-                if (data.products?.length) dispatch(setProducts(data.products));
-                if (data.customers?.length) dispatch(setCustomers(data.customers));
+                if (data.products?.length) {
+                  console.log('🔄 Dispatching setProducts with', data.products.length, 'products');
+                  dispatch(setProducts(data.products));
+                } else {
+                  console.warn('⚠️ No products in complete event!');
+                }
+                
+                if (data.customers?.length) {
+                  console.log('🔄 Dispatching setCustomers with', data.customers.length, 'customers');
+                  dispatch(setCustomers(data.customers));
+                } else {
+                  console.warn('⚠️ No customers in complete event!');
+                }
+                
+                if (data.invoices?.length) {
+                  console.log('🔄 Dispatching setInvoices with', data.invoices.length, 'invoices');
+                  dispatch(setInvoices(data.invoices));
+                }
+                
                 setExtras(data.extraDetails || '');
                 break;
 

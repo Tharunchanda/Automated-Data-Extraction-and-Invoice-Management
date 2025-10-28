@@ -8,6 +8,7 @@ export default function Products() {
   const dispatch = useDispatch();
 
   console.log('📦 Products component render:', products?.length || 0, 'products');
+  console.log('📦 Products data:', products);
 
   const onNameChange = (id, name) => {
     dispatch(updateProduct({ id, changes: { name } }));
