@@ -75,8 +75,8 @@ export default function Download() {
           name: p.name || '-',
           quantity: p.quantity || 0,
           unitPrice: p.unitPrice || '-',
-          tax: p.tax || '-',
-          priceWithTax: p.priceWithTax || '-'
+          tax: p.tax || (p.taxPercent != null ? `${p.taxPercent}%` : '-'),
+          priceWithTax: p.priceWithTax ?? p.unitPrice ?? '-'
         });
       });
       

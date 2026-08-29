@@ -162,6 +162,80 @@ function computeInvoiceTotals(inv) {
     total
   };
 }
+
+function normalizeProductTax(item, invoiceTaxPercent) {
+  const explicit = item?.taxPercent ?? item?.taxPercentValue ?? null;
+  if (explicit != null) return Number(explicit);
+
+  if (typeof item?.tax === 'number') {
+    return item.tax > 1 ? item.tax : Number(item.tax);
+  }
+
+  if (typeof item?.tax === 'string') {
+    const percentMatch = item.tax.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+    if (percentMatch) return Number(percentMatch[1]);
+
+    const numeric = Number(item.tax.replace(/[^0-9.\-]/g, ''));
+    if (Number.isFinite(numeric)) return numeric;
+  }
+
+  if (invoiceTaxPercent != null) return Number(invoiceTaxPercent);
+  return null;
+}
+
+function deriveProductsFromInvoices(invoices = []) {
+  const productMap = new Map();
+
+  for (const inv of invoices) {
+    const invoiceTaxPercent = getInvoiceTaxPercent(inv);
+
+    for (const item of inv.items || []) {
+      const name = item.name || item.product || item.description || 'Item';
+      const key = String(name).trim().toLowerCase();
+      const qty = Number(item.qty ?? item.quantity ?? 1) || 1;
+      const unitPrice = item.unitPrice ?? item.unitPriceExclTax ?? item.price ?? null;
+      const taxPercent = normalizeProductTax(item, invoiceTaxPercent);
+      const unitPriceWithTax = item.unitPriceWithTax ?? null;
+
+      const existing = productMap.get(key) || {
+        name,
+        description: item.description || null,
+        quantity: 0,
+        unitPrice: unitPrice != null ? Number(unitPrice) : null,
+        tax: null,
+        priceWithTax: null
+      };
+
+      existing.quantity += qty;
+
+      if (unitPrice != null) {
+        existing.unitPrice = existing.unitPrice ?? Number(unitPrice);
+      }
+
+      if (taxPercent != null) {
+        existing.tax = `${Number(taxPercent)}%`;
+      }
+
+      if (unitPriceWithTax != null) {
+        existing.priceWithTax = Number(unitPriceWithTax);
+      } else if (unitPrice != null && taxPercent != null) {
+        existing.priceWithTax = Number((unitPrice * (1 + taxPercent / 100)).toFixed(2));
+      }
+
+      productMap.set(key, existing);
+    }
+  }
+
+  return Array.from(productMap.values()).map((p, index) => ({
+    id: index + 1,
+    name: p.name,
+    description: p.description,
+    quantity: p.quantity,
+    unitPrice: p.unitPrice,
+    tax: p.tax,
+    priceWithTax: p.priceWithTax
+  }));
+}
 // --------------------------------------------------------------------
 
 // Multer error handling middleware
@@ -208,21 +282,29 @@ app.post('/api/extract', upload.array('files'), async (req, res) => {
 
     // 3. Process and link entities
     console.log('🔄 Processing entities...');
-    
-    // Add IDs to products and customers and normalize product fields expected by frontend
-    results.products = (results.products || []).map(p => ({
-      // normalize product shape for frontend
-      id: prodId++,
-      name: p.name || p.productName || 'Item',
-      description: p.description || null,
-      // frontend expects quantity, unitPrice, tax, priceWithTax
-      quantity: typeof p.quantity === 'number' ? p.quantity : (p.qty || 0),
-      unitPrice: p.unitPrice ?? p.price ?? null,
-      tax: p.tax ?? null,
-      priceWithTax: p.priceWithTax ?? p.unitPrice ?? p.price ?? null,
-      // keep any original fields too (original fields merged last)
-      ...p
-    }));
+
+    const derivedProducts = deriveProductsFromInvoices(results.invoices || []);
+    const normalizedProducts = (results.products || []).map(p => {
+      const taxPercent = p.taxPercent ?? p.tax?.percent ?? null;
+      const derivedTax = p.tax ?? (taxPercent != null ? `${Number(taxPercent)}%` : null);
+      const derivedInclusive = p.priceWithTax ?? p.unitPriceWithTax ?? p.unitPrice ?? p.price ?? null;
+      const normalized = {
+        id: prodId++,
+        name: p.name || p.productName || 'Item',
+        description: p.description || null,
+        quantity: typeof p.quantity === 'number' ? p.quantity : (p.qty || 0),
+        unitPrice: p.unitPrice ?? p.price ?? null,
+        tax: derivedTax,
+        priceWithTax: p.priceWithTax ?? p.unitPriceWithTax ?? (derivedInclusive != null && taxPercent != null && p.unitPrice != null ? Number((p.unitPrice * (1 + Number(taxPercent) / 100)).toFixed(2)) : derivedInclusive),
+      };
+
+      return {
+        ...p,
+        ...normalized
+      };
+    });
+
+    results.products = normalizedProducts.length ? normalizedProducts : derivedProducts;
     // Normalize customers with expected fields (name, contact/phone, address, totalPurchase)
     results.customers = (results.customers || []).map(c => ({
       id: custId++,
@@ -494,16 +576,25 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
         const fileResults = await geminiExtract([file]);
         
         // Normalize and add IDs to products
-        const products = (fileResults.products || []).map(p => ({
-          id: prodId++,
-          name: p.name || p.productName || 'Item',
-          description: p.description || null,
-          quantity: typeof p.quantity === 'number' ? p.quantity : (p.qty || 0),
-          unitPrice: p.unitPrice ?? p.price ?? null,
-          tax: p.tax ?? null,
-          priceWithTax: p.priceWithTax ?? p.unitPrice ?? p.price ?? null,
-          ...p
-        }));
+        const products = (fileResults.products || []).map(p => {
+          const taxPercent = p.taxPercent ?? p.tax?.percent ?? null;
+          const derivedTax = p.tax ?? (taxPercent != null ? `${Number(taxPercent)}%` : null);
+          const derivedInclusive = p.priceWithTax ?? p.unitPriceWithTax ?? p.unitPrice ?? p.price ?? null;
+          const normalized = {
+            id: prodId++,
+            name: p.name || p.productName || 'Item',
+            description: p.description || null,
+            quantity: typeof p.quantity === 'number' ? p.quantity : (p.qty || 0),
+            unitPrice: p.unitPrice ?? p.price ?? null,
+            tax: derivedTax,
+            priceWithTax: p.priceWithTax ?? p.unitPriceWithTax ?? (derivedInclusive != null && taxPercent != null && p.unitPrice != null ? Number((p.unitPrice * (1 + Number(taxPercent) / 100)).toFixed(2)) : derivedInclusive),
+          };
+
+          return {
+            ...p,
+            ...normalized
+          };
+        });
 
         // Normalize and add IDs to customers
         const customers = (fileResults.customers || []).map(c => ({
@@ -549,6 +640,12 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
         });
 
         allInvoices.push(...invoices);
+
+        if (!products.length && invoices.length) {
+          const derived = deriveProductsFromInvoices(invoices);
+          if (derived.length) allProducts.push(...derived);
+        }
+
         processedFiles.push({ file: file.originalname, status: 'success' });
 
         // Send incremental update with current file's data
@@ -575,6 +672,10 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
     }
 
     // After all files processed, aggregate quantities and totals
+    if (!allProducts.length && allInvoices.length) {
+      allProducts.push(...deriveProductsFromInvoices(allInvoices));
+    }
+
     // Aggregate products
     try {
       const prodMap = new Map();

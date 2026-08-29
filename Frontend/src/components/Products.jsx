@@ -48,8 +48,8 @@ export default function Products() {
                 </td>
                 <td className="p-2 sm:p-3 border-t border-blue-100 font-medium text-blue-700 text-xs sm:text-sm">{p.quantity||0}</td>
                 <td className="p-2 sm:p-3 border-t border-blue-100 text-gray-700 text-xs sm:text-sm">₹{p.unitPrice||'-'}</td>
-                <td className="p-2 sm:p-3 border-t border-blue-100 text-gray-700 text-xs sm:text-sm">{p.tax||'-'}</td>
-                <td className="p-2 sm:p-3 border-t border-blue-100 font-semibold text-blue-700 text-xs sm:text-sm">₹{p.priceWithTax||'-'}</td>
+                <td className="p-2 sm:p-3 border-t border-blue-100 text-gray-700 text-xs sm:text-sm">{p.tax || (p.taxPercent != null ? `${p.taxPercent}%` : '-')}</td>
+                <td className="p-2 sm:p-3 border-t border-blue-100 font-semibold text-blue-700 text-xs sm:text-sm">₹{p.priceWithTax ?? p.unitPrice ?? '-'}</td>
               </tr>
             ))}
           </tbody>
