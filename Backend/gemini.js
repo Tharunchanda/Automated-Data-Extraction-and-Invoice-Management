@@ -49,11 +49,11 @@ export async function geminiExtract(files) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   
   // Use a modern, multimodal model that can "see" the document layout
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  console.log('✅ Initialized Gemini API with gemini-2.5 flash');
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  console.log('✅ Initialized Gemini API with gemini-3.6-flash');
 
   const results = {
-    invoices: [],
+    invoices: [],   
     products: [],
     customers: [],
     files: [] // To track status of each file

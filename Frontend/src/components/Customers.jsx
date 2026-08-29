@@ -26,7 +26,7 @@ export default function Customers() {
       ) : (
       <div className="overflow-x-auto rounded-xl border border-blue-200 shadow-sm -mx-3 sm:mx-0">
         <table className="w-full table-auto min-w-[500px]">
-          <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+          <thead className="bg-linear-to-r from-blue-600 to-blue-700 text-white">
             <tr>
               <th className="p-2 sm:p-3 text-left font-semibold text-xs sm:text-sm">Customer Name</th>
               <th className="p-2 sm:p-3 text-left font-semibold text-xs sm:text-sm">Phone</th>
