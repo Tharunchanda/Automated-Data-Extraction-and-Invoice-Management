@@ -59,7 +59,7 @@ export async function geminiExtract(files) {
     files: [] // To track status of each file
   };
 
-  // This prompt is sent with every file
+  // Prompt updated to include total/generic GST under taxes
   const prompt = `
     You are an invoice data extraction expert. Analyze the attached document (image, PDF, or spreadsheet)
     and extract all relevant information in JSON format.
@@ -71,46 +71,57 @@ export async function geminiExtract(files) {
           name,                       // Description
           qty,                        // Quantity (number)
           unitPrice,                  // Rate/Item (exclusive of tax)
-          taxableValue: number|null,  // row's Taxable Value if present
-          taxPercent: number|null,    // GST percent for the line (e.g., 18 for 18%)
-          taxAmountPerUnit: number|null, // if GST amount provided for the row: GST amount / qty
-          unitPriceWithTax: number|null   // unitPrice + taxAmountPerUnit if visible or derivable
+          taxableValue: number|null,   // row's Taxable Value if present
+          taxPercent: number|null,     // GST percent for the line (e.g., 5, 12, or 18)
+          taxAmountPerUnit: number|null, // if GST amount provided for the row: (GST amount for row) / qty
+          unitPriceWithTax: number|null   // unitPrice + taxAmountPerUnit or (Amount / Quantity)
         }],
         // Totals and taxes
         totals: {
-          itemsCount: number|null,      // from "Total Items / Qty"
-          totalQty: number|null,        // from "Total Items / Qty"
-          taxableAmount: number|null,   // e.g., "Taxable Amount"
-          amountPayable: number|null,   // e.g., "Amount Payable"
-          totalDue: number|null,        // e.g., "Total Amount due" or final Total
-          total: number|null            // fallback overall total if only one total present
+          itemsCount: number|null,      // Total number of item rows (e.g., 4 from "4/1,095.000")
+          totalQty: number|null,        // Total item quantity (e.g., 1095 from "4/1,095.000")
+          taxableAmount: number|null,   // Subtotal / Taxable Amount
+          amountPayable: number|null,   // Amount Payable
+          totalDue: number|null,        // Total Amount due
+          total: number|null            // Final total amount
         },
         taxes: {
-          CGST: { percent: number|null, amount: number|null }|null,
-          SGST: { percent: number|null, amount: number|null }|null,
-          IGST: { percent: number|null, amount: number|null }|null
+          CGST: { percent: number|null, amount: number|null }|null, // Total CGST amount (sum all CGST rows if multiple rates exist)
+          SGST: { percent: number|null, amount: number|null }|null, // Total SGST amount (sum all SGST rows if multiple rates exist)
+          IGST: { percent: number|null, amount: number|null }|null, // Total IGST amount
+          GST: { percent: number|null, amount: number|null }|null   // Overall combined total GST amount/percent or fallback total tax
         },
-        charges: [                     // Additional charges listed (e.g., Making charges, Shipping, Debit card charges)
+        charges: [                     // Additional fees/charges listed (e.g., Making charges, Shipping, Debit card charges)
           { label: string, amount: number }
         ]
       }]
     - products: [{ name, description: string|null, price: number|null, taxPercent: number|null }]
     - customers: [{ name, address: string|null, contact: string|null }]
 
-    Mapping guidance:
-    - If columns like Rate/Item, Quantity, Taxable Value, GST, Amount are present:
-      unitPrice = Rate/Item (exclusive of tax)
-      taxPercent = parse percent from GST column when shown (e.g., 18)
-      If GST amount per line is shown, taxAmountPerUnit = (GST amount for the line) / Quantity
-      If inclusive line Amount is shown and exclusive unitPrice is known, unitPriceWithTax = (Amount / Quantity)
+    Detailed Extraction Guidance:
+    1. Line Items:
+       - unitPrice = Rate/Item (exclusive of tax).
+       - taxPercent = Parse numerical percentage from GST column when shown (e.g., "238.10 (5%)" -> 5).
+       - taxAmountPerUnit = (Line GST amount) / Quantity.
+       - unitPriceWithTax = (Inclusive Line Amount) / Quantity.
+
+    2. Taxes Section:
+       - Extract CGST, SGST, IGST, as well as total combined GST under `GST`.
+       - Aggregate multiple tax rate entries into total amounts for CGST, SGST, IGST, and GST.
+       - Example: If the document lists multiple lines like "CGST 2.5%: 940.48" and "CGST 6.0%: 1607.14", sum them (940.48 + 1607.14 = 2547.62) into `taxes.CGST.amount`.
+       - Sum all taxes (CGST + SGST + IGST) into `taxes.GST.amount` if a overall GST amount is present or computable.
+       - If a single tax rate applies to the entire document, populate `percent`. If multiple rates exist, set `percent` to null and populate the total aggregated `amount`.
+
+    3. Additional Charges:
+       - Extract extra charges listed (e.g., "Making charges", "debit card charges", "Shipping Charges") into the `charges` array as separate objects `{ label, amount }`.
 
     Rules:
-    1. Analyze the visual layout to correctly associate items, prices, taxes, totals, charges.
-    2. Dates must be YYYY-MM-DD.
-    3. All currency numbers must be numeric (remove commas, symbols).
+    1. Analyze the visual layout to correctly associate items, prices, taxes, totals, and charges.
+    2. Dates must strictly use YYYY-MM-DD format.
+    3. All currency values must be raw numbers (remove ₹, $, commas, symbols).
     4. Always include qty as a number; if unclear use 1.
-    5. If a field is not found, use null.
-    6. Do not include any text outside of the JSON.
+    5. If a field is not found or not applicable, use null.
+    6. Do not include any text or commentary outside of the JSON.
   `;
 
   for (const file of files) {
