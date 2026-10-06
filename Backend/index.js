@@ -569,11 +569,31 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
           currentFile: i + 1, 
           totalFiles: req.files.length, 
           fileName: file.originalname,
-          status: 'processing'
+          status: 'processing',
+          stage: 'processing',
+          message: `Processing ${file.originalname}...`
+        });
+
+        sendEvent('progress', {
+          currentFile: i + 1,
+          totalFiles: req.files.length,
+          fileName: file.originalname,
+          status: 'processing',
+          stage: 'extracting',
+          message: `Reading invoice details from ${file.originalname}...`
         });
 
         // Extract data for this single file
         const fileResults = await geminiExtract([file]);
+
+        sendEvent('progress', {
+          currentFile: i + 1,
+          totalFiles: req.files.length,
+          fileName: file.originalname,
+          status: 'processing',
+          stage: 'organizing',
+          message: `Organizing extracted details from ${file.originalname}...`
+        });
         
         // Normalize and add IDs to products
         const products = (fileResults.products || []).map(p => {
@@ -647,6 +667,7 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
         }
 
         processedFiles.push({ file: file.originalname, status: 'success' });
+        const hasDetails = invoices.length > 0 || products.length > 0 || customers.length > 0;
 
         // Send incremental update with current file's data
         sendEvent('fileComplete', {
@@ -654,6 +675,10 @@ app.post('/api/extract-stream', upload.array('files'), async (req, res) => {
           invoices,
           products,
           customers,
+          status: hasDetails ? 'success' : 'no-details',
+          message: hasDetails
+            ? `Details found in ${file.originalname}.`
+            : `No details found in ${file.originalname}.`,
           currentFile: i + 1,
           totalFiles: req.files.length
         });

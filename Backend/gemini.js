@@ -3,9 +3,44 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 import ExcelJS from 'exceljs';
 
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
+const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.8-flash';
+const MAX_TRANSIENT_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
+
+function isTransientGeminiError(error) {
+ const status = error?.status;
+ return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function getRetryDelay(attempt) {
+ const exponentialDelay = INITIAL_RETRY_DELAY_MS * (2 ** attempt);
+ const jitter = Math.floor(Math.random() * 250);
+ return exponentialDelay + jitter;
+}
+
+async function generateContentWithRetry(model, content, modelName) {
+ for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+   try {
+     return await model.generateContent(content);
+   } catch (error) {
+     if (!isTransientGeminiError(error) || attempt === MAX_TRANSIENT_RETRIES) {
+       throw error;
+     }
+
+     const delay = getRetryDelay(attempt);
+     console.warn(
+       `Gemini ${modelName} request failed with HTTP ${error.status}; ` +
+       `retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_TRANSIENT_RETRIES})`
+     );
+     await new Promise(resolve => setTimeout(resolve, delay));
+   }
+ }
+}
+
 /**
- * Extracts a JSON object from a string, even if it's wrapped in
- * markdown backticks (```json ... ```) or has other text.
+* Extracts a JSON object from a string, even if it's wrapped in
+* markdown backticks (```json ... ```) or has other text.
  */
 function extractJson(text) {
   console.log('Attempting to parse JSON...');
@@ -48,9 +83,13 @@ export async function geminiExtract(files) {
   console.log('\n🚀 Starting extraction process...');
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   
-  // Use a modern, multimodal model that can "see" the document layout
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-  console.log('✅ Initialized Gemini API with gemini-3.6-flash');
+const modelName = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+const fallbackModelName = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
+const model = genAI.getGenerativeModel({ model: modelName });
+const fallbackModel = fallbackModelName && fallbackModelName !== modelName
+  ? genAI.getGenerativeModel({ model: fallbackModelName })
+  : null;
+console.log(`✅ Initialized Gemini API with ${modelName}`);
 
   const results = {
     invoices: [],   
@@ -145,7 +184,7 @@ export async function geminiExtract(files) {
         console.log(`✅ CSV size ${text.length} characters`);
 
         console.log('Generating content from model (this may take a moment)...');
-        const responseObj = await model.generateContent([
+const responseObj = await generateWithFallback([
           prompt,
           { text }
         ]);
@@ -172,7 +211,7 @@ export async function geminiExtract(files) {
         console.log(`✅ Parsed Excel with sheets: ${Object.keys(sheets).join(', ')}`);
 
         console.log('Generating content from model (this may take a moment)...');
-        const responseObj = await model.generateContent([
+const responseObj = await generateWithFallback([
           prompt,
           { text: excelText }
         ]);
@@ -188,7 +227,7 @@ export async function geminiExtract(files) {
         };
 
         console.log('Generating content from model (this may take a moment)...');
-        const responseObj = await model.generateContent([
+        const responseObj = await generateWithFallback([
           prompt,  // The text prompt
           filePart // The image or PDF file data
         ]);
@@ -232,8 +271,10 @@ export async function geminiExtract(files) {
         errorMessage = 'Gemini API quota exceeded. Please try again later or upgrade your API plan.';
       } else if (error.message?.includes('rate limit')) {
         errorMessage = 'Gemini API rate limit reached. Please wait a moment and try again.';
-      } else if (error.message?.includes('API key')) {
-        errorMessage = 'Invalid Gemini API key. Please check your configuration.';
+} else if (isTransientGeminiError(error)) {
+errorMessage = 'Gemini service is temporarily unavailable. Please try again shortly.';
+} else if (error.message?.includes('API key')) {
+errorMessage = 'Invalid Gemini API key. Please check your configuration.';
       } else if (error.message?.includes('timeout')) {
         errorMessage = 'Request timed out. Please try with a smaller file.';
       }
@@ -248,4 +289,20 @@ export async function geminiExtract(files) {
 
   console.log('\n✅ Extraction process finished.');
   return results;
+
+async function generateWithFallback(content) {
+  try {
+    return await generateContentWithRetry(model, content, modelName);
+  } catch (error) {
+    if (!fallbackModel || !isTransientGeminiError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      `Gemini ${modelName} remained unavailable after retries; ` +
+      `trying fallback model ${fallbackModelName}`
+    );
+    return generateContentWithRetry(fallbackModel, content, fallbackModelName);
+  }
+}
 }

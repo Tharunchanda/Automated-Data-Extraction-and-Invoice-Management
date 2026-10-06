@@ -12,6 +12,7 @@ export default function Upload() {
   const [extras, setExtras] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [fileProgress, setFileProgress] = useState([]);
+  const [activity, setActivity] = useState('');
   const dispatch = useDispatch();
 
   const onFiles = (e) => setFiles(Array.from(e.target.files));
@@ -26,6 +27,7 @@ export default function Upload() {
       setIsLoading(true);
       setFileProgress([]);
       setExtras('');
+      setActivity('');
       
       // Clear existing data
       dispatch(setInvoices([]));
@@ -44,6 +46,7 @@ export default function Upload() {
       setFileProgress(initialProgress);
 
       setStatus('⬆️ Uploading to server...');
+      setActivity('Uploading files to the server...');
       const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const API_BASE = isLocalDev ? '/api' : (import.meta.env.VITE_API_URL || '/api');
 
@@ -91,7 +94,8 @@ export default function Upload() {
 
             switch (eventType) {
               case 'progress':
-                setStatus(`🔄 Processing ${data.fileName} (${data.currentFile}/${data.totalFiles})...`);
+                setStatus(`🔄 ${data.message || `Processing ${data.fileName}`}`);
+                setActivity(data.message || `Processing ${data.fileName}...`);
                 setFileProgress(prev => prev.map(f => 
                   f.name === data.fileName 
                     ? { ...f, status: 'processing' }
@@ -100,10 +104,13 @@ export default function Upload() {
                 break;
 
               case 'fileComplete':
-                setStatus(`✅ Completed ${data.fileName} (${data.currentFile}/${data.totalFiles})`);
+                setStatus(data.status === 'no-details'
+                  ? `ℹ️ No details found in ${data.fileName}`
+                  : `✅ Completed ${data.fileName} (${data.currentFile}/${data.totalFiles})`);
+                setActivity(data.message || `Finished ${data.fileName}.`);
                 setFileProgress(prev => prev.map(f => 
                   f.name === data.fileName 
-                    ? { ...f, status: 'complete', data }
+                    ? { ...f, status: data.status === 'no-details' ? 'no-details' : 'complete', data }
                     : f
                 ));
                 
@@ -129,7 +136,12 @@ export default function Upload() {
                 break;
 
               case 'complete':
-                setStatus(`✅ All files processed successfully!`);
+                setStatus(data.invoices?.length || data.products?.length || data.customers?.length
+                  ? '✅ All files processed successfully!'
+                  : 'ℹ️ No details found in the uploaded files');
+                setActivity(data.invoices?.length || data.products?.length || data.customers?.length
+                  ? 'All files have been processed.'
+                  : 'Processing finished, but no invoice details were found.');
                 
                 console.log('✨ complete event received:', {
                   invoices: data.invoices?.length || 0,
@@ -165,6 +177,7 @@ export default function Upload() {
 
               case 'error':
                 setStatus(`❌ Error: ${data.error}`);
+                setActivity(`Backend error: ${data.error}`);
                 break;
             }
           }
@@ -175,6 +188,7 @@ export default function Upload() {
       console.error('Upload error:', err);
       const errorMsg = err?.message || 'Unknown error';
       setStatus(`❌ Error: ${errorMsg}`);
+      setActivity(`Upload failed: ${errorMsg}`);
     } finally {
       setIsLoading(false);
     }
@@ -198,8 +212,8 @@ export default function Upload() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <p className="text-xs sm:text-sm font-semibold text-amber-900 mb-1">⏱️ Processing in progress...</p>
-                <p className="text-xs text-amber-700">Good and accurate extraction takes time. Please be patient while we carefully analyze your documents.</p>
+                <p className="text-xs sm:text-sm font-semibold text-amber-900 mb-1">⏱️ {activity || 'Processing in progress...'}</p>
+                <p className="text-xs text-amber-700">The backend is working through your files. Please wait while the details are extracted.</p>
               </div>
             </div>
           </div>
@@ -338,11 +352,13 @@ export default function Upload() {
                     fileInfo.status === 'pending' ? 'bg-gray-200 text-gray-600' :
                     fileInfo.status === 'processing' ? 'bg-blue-100 text-blue-700' :
                     fileInfo.status === 'complete' ? 'bg-green-100 text-green-700' :
+                    fileInfo.status === 'no-details' ? 'bg-amber-100 text-amber-700' :
                     'bg-red-100 text-red-700'
                   }`}>
                     {fileInfo.status === 'pending' ? 'Pending' :
                      fileInfo.status === 'processing' ? 'Processing...' :
                      fileInfo.status === 'complete' ? 'Complete' :
+                     fileInfo.status === 'no-details' ? 'No details found' :
                      'Error'}
                   </span>
                 </div>
